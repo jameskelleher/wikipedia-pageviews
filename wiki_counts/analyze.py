@@ -25,9 +25,6 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
     # get the list of domains and pages to not include in the analysis
     blacklist_set = make_blacklist_set()
 
-    # fill the queue with gzip files that have already been downloaded from tmp
-    fill_queue_from_tmp(queue)
-
     # as long as downloads are not done or the queue is not empty,
     # this process runs
     while not downloads_done.value or not queue.empty():
@@ -37,6 +34,7 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
 
         if queue.empty():
             print('no files yet!')
+            # sleep so resources aren't hogged
             time.sleep(5)
         else:
             # pulls the name of a downloaded gzip archive
@@ -218,16 +216,8 @@ def make_blacklist_set():
                 continue
             domain_code = split[0]
             page_title = split[1]
+
+            # cache domain_code and page_title as a tuple
             blacklist_set.add((domain_code, page_title))
 
     return blacklist_set
-
-
-def fill_queue_from_tmp(queue):
-    """fill queue with gzip files that have already been download to tmp
-
-    Arguments:
-        queue {Queue(str)} -- queue of paths of gzip archives to process
-    """
-    path = os.path.join(TMP_DIR, '*.gz')
-    [queue.put(abspath) for abspath in glob.glob(path)]
