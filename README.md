@@ -16,6 +16,8 @@
 
 7. To run for every hour between a range of dates: `python run_wiki_counts.py "2020-01-01 8:00" "2020-01-02 20:00"`
 
+8. To run unit tests, run `pytest`. The unit tests on asynchronous code generate a lot of warnings, so `pytest --disable-warnings` is recommended
+
 ## Discussion
 
 This program records the top 25 most viewed Wikipedia pages for each domain for a given datetime. It can also be given a start and end time, and will generate a results file for every hour within that range.
@@ -26,13 +28,15 @@ The program uses two parallel processes to produce its results, a Downloader and
 
 Downloading the files is mostly I/O-bound, so it provides a good use case for Python's `asyncio` and `aiohttp` libraries. You can get a significant speedboost within a single core by using async (about 25% faster on my computer/network). On the other hand, file analysis is mostly CPU-bound. By putting the Analyzer on a different core, we can process files while others are downloaded.
 
-The bottleneck here is downloading the data dumps. The archives can only handle three connections at the same time, otherwise it starts throwing 503 errors. Therefore, The Downloader defaults to using three asynchronous download tasks. On my network, a single Analyzer was able to keep up with the Downloader. On a faster network, this may not be the case, but you can change these parameters in `config.py`.
+The bottleneck here is downloading the data dumps. The archives can only handle three connections at the same time, otherwise it starts throwing 503 errors. Therefore, The Downloader defaults to using three asynchronous download tasks. On my network, a single Analyzer was able to keep up with the Downloader. On a different network, this may not be the case, but you can choose the number of download tasks by setting `DEFAULT_NUM_DOWNLOADERS` in `config.py`.
 
 Instead of passing archive data directly to the Analyzer, the Downloader saves the files to a temporary directory, which the Analyzer will then read from. While I considered passing archive data directly to the Analyzer, I decided to persist them temporarily instead. This is safer, as it makes memory leakage less likely should something go wrong with the Analyzer. Also, the Analyzer is able to read from archives already in the temporary folder. If the pipeline goes down with some archives already downloaded to the temporary folder, it does not have to redownload them, it will just load them back into the queue.
 
+The Analyzer uses a min heap to collect the top 25 most viewed pages for each domain. There is one min heap per domain. For every line in the data dump, the analyzer checks its domain's min heap. If the min heap has less than 25 items in it, we'll add the page name and its view counts to the min heap. Otherwise, we check the smallest element in the min heap. If this heap element has less page views than than the current line element, it's not one of the top 25 most viewed, so we pop it from the heap and add the data for the current line element. Otherwise, we continue iterating through the data dump. The size of the heap can be adjusted by changing the value of `TOP_N_PAGEVIEWS` in `config.py`.
+
 One challenge to this approach is ensuring that if one process fails the others terminate as well. Therefore, I coded a kill switch (really a boolean flag stored in shared space) that halts all other processes should it be flipped. If a process raises an unexpected exception, the switch is thrown.
 
-Let's say that a user enters dates that create invalid URLs - for example, they enter in a date in the future. I decided to take a friendly approach, and simply skip cases in which attempting a download results in a 404. In a production setting, it may be best to throw errors instead.
+Let's say that a user enters dates that create invalid URLs - for example, they enter in a date in the future. I decided to take a friendly approach, and simply skip cases in which attempting a download results in a 404. In a production setting, it may be best to raise exceptions instead.
 
 One task that does not use parallelism is the Date Parser. This takes a start date and and end date, and converts it to the range of URLs that will be downloaded (or converts a single date to a download URL). There are about 47520 files that could be downloaded, a List that contains all of their URLs would only be about 380 KB big. Even in its worst case, this is not a big enough task to warrant use of parallelism.
 
@@ -42,7 +46,7 @@ The Downloader is coded in `download.py`, the Analyzer in `analyze.py`, and the 
 
 ### What additional things would you want to operate this application in a production setting?
 
-In a production setting, it may be possible to open up more connections to the archives. In that case, I could further parallelize this. For example, I could distribute partitions of the URL set to multiple machines, and on those machines run this program on each of those partitions.
+In a production setting, it may be possible to open up more connections to the archives. In that case, I could further parallelize this. For example, I could distribute partitions of the URL set to multiple machines, and on those machines run this program on each of those partitions. I would also add more complex exception handling. Currently, if a file download attempt results in a 404, the program simply catches the error and moves on to the next URL. In a production setting it could be more useful to throw an exception instead, and have a scheduler determine how/if the process should be retried.
 
 ### What might change about your solution if this application needed to run automatically for each hour of the day?
 
@@ -54,4 +58,4 @@ I've already included some unit tests. Testing the downloader is tricky, as it m
 
 ### How you’d improve on this application design?
 
-From the command line, you can only enter in dates. Everything else is hard-coded (mostly in `config.py`). It would be nice to have more controls over parameters from the command line. Better error reporting would be good too. Right now, issues that pop up (such as malformed lines in the input files) are simply printed to the console. It would be good to have these issues persisted to a log file, so they can be easily kept track of and reviewed later. 
+From the command line, you can only enter in dates. Everything else is hard-coded (mostly in `config.py`). It would be nice to have more controls over parameters from the command line. Better error reporting would be good too. Right now, issues that pop up (such as malformed lines in the input files) are simply printed to the console. It would be good to use a more powerful logger than can log these issues to a file, so they can be easily kept track of and reviewed later. 

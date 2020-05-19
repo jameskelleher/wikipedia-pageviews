@@ -97,7 +97,7 @@ def build_most_viewed_map(file_abspath, blacklist_set):
             if in_blacklist_set(domain_code, page_title, blacklist_set):
                 continue
 
-            add_to_map(most_viewed_map, domain_code, page_title, count_views)
+            add_to_heap_map(most_viewed_map, domain_code, page_title, count_views)
 
     return most_viewed_map
 
@@ -141,7 +141,7 @@ def in_blacklist_set(domain_code, page_title, blacklist_set):
     return (domain_code, page_title) in blacklist_set
 
 
-def add_to_map(most_viewed_map, domain_code, page_title, count_views, top_n_pageviews=TOP_N_PAGEVIEWS):
+def add_to_heap_map(most_viewed_map, domain_code, page_title, count_views, top_n_pageviews=TOP_N_PAGEVIEWS):
     """add page info to the most viewed map, if one of the most viewed
 
     Arguments:
@@ -189,6 +189,9 @@ def persist_results(abspath, most_viewed_map):
 
     with open(result_path, 'w+') as f:
         # iterate through most_viewed_map
+        # python dicts remember the order of insertion,
+        # so as long as the archives are alphabetized by domain,
+        # the output will be alphabetized by domain as well
         for domain, heap in most_viewed_map.items():
             while len(heap) > 0:
                 # this saves our records in increasing order
@@ -209,15 +212,29 @@ def make_blacklist_set():
 
     with open(blacklist_file, 'r') as f:
         for line in f:
-            split = line.strip().split()
-            # there's one line that I'm not sure how to handle, so I skip it
-            if len(split) < 2:
+            try:
+                add_to_blacklist(line, blacklist_set)
+            except AssertionError:
+                # there's one line that I'm not sure how to handle, so I skip it
                 print(f'malformed blacklist line: {line.strip()}')
-                continue
-            domain_code = split[0]
-            page_title = split[1]
-
-            # cache domain_code and page_title as a tuple
-            blacklist_set.add((domain_code, page_title))
 
     return blacklist_set
+
+
+def add_to_blacklist(line, blacklist_set):
+    """add data from a line of the blacklist file to the blacklist_set
+
+    Arguments:
+        line {str} -- line from the blacklist file
+        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
+    """
+    split = line.strip().split()
+    
+    # check input data is good
+    assert len(split) == 2
+        
+    domain_code = split[0]
+    page_title = split[1]
+
+    # cache domain_code and page_title as a tuple
+    blacklist_set.add((domain_code, page_title))

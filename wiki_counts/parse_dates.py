@@ -13,25 +13,11 @@ def parse_dates(start, end):
         start {string, None} -- start date as a string, if None it is set to utcnow minus 24 hours
         end {string, None} -- end date as a string, if None function returns only one URL for the start date
 
-    Raises:
-        ValueError: end date before start date, or date strings not parsable by pd.Timestamp
-
     Returns:
         List -- list of urls to download
     """
-    # if start is None, set to utcnow minus 24 hours, rounded up to nearest hour
-    start = parse_time_string(start) if start else \
-        pd.Timestamp.utcnow().ceil('H') - pd.Timedelta(hours=24)
-
-    # if end is None, we only get records for one datetime
-    end = parse_time_string(end) if end else start
-
-    # make sure we don't try to download records before earliest available date
-    earliest_start = pd.Timestamp(EARLIEST_DATE)
-    start = max(start, earliest_start)
-
-    if end < start:
-        raise ValueError('end date cannot be before start date')
+    # handle the inputted start and end dates
+    start, end = parse_start_and_end(start, end)
 
     # a timestamp for every hour in between start and end, inclusive
     to_download = pd.date_range(start=start, end=end, freq='H')
@@ -48,6 +34,40 @@ def parse_dates(start, end):
     to_download = list(date_map_and_filter)
 
     return to_download
+
+
+def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
+    """parse the start and end dates, and handle any discrepencies
+
+    Arguments:
+        start {string, None} -- start date as a string, if None it is set to utcnow minus 24 hours
+        end {string, None} -- end date as a string, if None function returns only one URL for the start date
+
+    Keyword Arguments:
+        earliest_date {str} -- earliest datetime with data available, as a string (default: {EARLIEST_DATE})
+
+    Raises:
+        ValueError: end date before start date, or date strings not parsable by pd.Timestamp
+
+    Returns:
+        Tuple(Timestamp, Timestamp) -- start date and end date as Timestamp objects
+    """
+    # if start is None, set to utcnow minus 24 hours, rounded up to nearest hour
+    start = parse_time_string(start) if start else \
+        pd.Timestamp.utcnow().ceil('H') - pd.Timedelta(hours=24)
+
+    # if end is None, we only get records for one datetime
+    end = parse_time_string(end) if end else start
+
+    # make sure we don't try to download records before earliest available date
+    earliest_start = pd.Timestamp(earliest_date)
+    start = max(start, earliest_start)
+    end = max(end, earliest_start)
+
+    if end < start:
+        raise ValueError('end date cannot be before start date')
+
+    return start, end
 
 
 def parse_time_string(time_str):
@@ -86,7 +106,7 @@ def date_to_url(datetime, already_downloaded):
     """convert a datetime to its corresponding wiki dump url
 
     Arguments:
-        datetime {datetime, Timestamp} -- datetime whose wiki pageviews dump will be downloaded
+        datetime {Timestamp} -- Timestamp whose corresponding wiki pageviews dump will be downloaded
         already_downloaded {Set(str)} -- set of filenames for datetimes whose pageviews have already been downloaded and processed
 
     Returns:
