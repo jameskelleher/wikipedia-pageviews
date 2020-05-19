@@ -4,7 +4,7 @@ from functools import wraps
 
 
 def killswitch_on_exception(func):
-    """if the function fails unexpectedly, throw a killswitch that terminates other processes
+    """decorator - if the function fails unexpectedly, throw a killswitch that terminates other processes
 
     Arguments:
         func {function} -- function that should throw a killswitch, should it fail
@@ -32,3 +32,22 @@ def killswitch_on_exception(func):
             process_killswitch.value = True
 
     return wrapper
+
+
+def filename_from_path(file_path, remove_gz=False):
+    """extract the filename from its path, removing ".gz" if necessary
+
+    Arguments:
+        file_path {str} -- path to file
+
+    Keyword Arguments:
+        remove_gz {bool} -- if True, strip ".gz" from filename (default: {False})
+
+    Returns:
+        str -- name of file
+    """
+    filename = file_path.split('/')[-1]
+    if remove_gz and filename.endswith('.gz'):
+        filename = filename[:-3]
+
+    return filename

@@ -2,7 +2,8 @@ import pandas as pd
 import glob
 import os
 
-from .config import ROOT_URL, RESULTS_DIR, EARLIEST_DATE
+from .config import ROOT_URL, RESULTS_DIR, TMP_DIR, EARLIEST_DATE
+from .utils import filename_from_path
 
 
 def parse_dates(start, end):
@@ -36,12 +37,12 @@ def parse_dates(start, end):
     to_download = pd.date_range(start=start, end=end, freq='H')
 
     # load the names of files that we already have
-    already_downloaded_set = get_already_processed_set()
+    exclusion_set = get_exclusion_set()
 
     # convert dates to urls, while filtering out dates we already have info for
     date_map_and_filter = filter(
         lambda x: x, map(
-            lambda date: date_to_url(date, already_downloaded_set),
+            lambda date: date_to_url(date, exclusion_set),
             to_download))
 
     to_download = list(date_map_and_filter)
@@ -98,7 +99,7 @@ def date_to_url(datetime, already_downloaded):
     # check to see if the file has already been downloaded and processed
     # we do "pageviews[:-3]" because the string ends in ".gz"
     if pageviews[:-3] in already_downloaded:
-        print(f'already downloaded {pageviews[:-3]} to {RESULTS_DIR}')
+        print(f'already downloaded {pageviews[:-3]}')
         return None
 
     # url looks like:
@@ -107,13 +108,25 @@ def date_to_url(datetime, already_downloaded):
     return url
 
 
-def get_already_processed_set():
-    """get a set of all wiki pageview files that have already been processed
+def get_exclusion_set():
+    """get a set of files we don't need to download, because they are processed or are ready to be processed
 
     Returns:
-        set -- set of filenames for datetimes whose pageviews have already been downloaded and processed
+        set -- set of filenames for datetimes whose pageviews or archives have already been downloaded
     """
-    downloaded = glob.glob(RESULTS_DIR + '/*')
-    downloaded_filenames = set([path.split('/')[-1] for path in downloaded])
+
+    # for every results file that we have in results, add the filename
+    # to the exclusion set
+    results_path = os.path.join(RESULTS_DIR, '*')
+    already_processed = glob.glob(results_path)
+    downloaded_filenames = set(
+        [filename_from_path(p) for p in already_processed])
+
+    # for every unprocessed gzip we have in tmp, add to filename
+    # to the exclusion set
+    tmp_path = os.path.join(TMP_DIR, '*.gz')
+    ready_for_processing = glob.glob(tmp_path)
+    downloaded_filenames = downloaded_filenames.union(set(
+        [filename_from_path(p, remove_gz=True) for p in ready_for_processing]))
 
     return downloaded_filenames

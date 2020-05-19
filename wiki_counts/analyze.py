@@ -2,12 +2,13 @@
 import gzip
 import heapq
 import os
+import glob
 import time
 
 from collections import defaultdict
 
 from .config import TMP_DIR, RESULTS_DIR, TOP_N_PAGEVIEWS, ROOT_DIR
-from .decorators import killswitch_on_exception
+from .utils import killswitch_on_exception, filename_from_path
 
 
 @killswitch_on_exception
@@ -24,6 +25,9 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
     # get the list of domains and pages to not include in the analysis
     blacklist_set = make_blacklist_set()
 
+    # fill the queue with gzip files that have already been downloaded from tmp
+    fill_queue_from_tmp(queue)
+
     # as long as downloads are not done or the queue is not empty,
     # this process runs
     while not downloads_done.value or not queue.empty():
@@ -36,30 +40,33 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
             time.sleep(5)
         else:
             # pulls the name of a downloaded gzip archive
-            filename = queue.get()
+            file_abspath = queue.get()
 
             # analyzes the gzip archive
-            analyze_file(filename, blacklist_set)
+            analyze_file(file_abspath, blacklist_set)
 
 
-def analyze_file(filename, blacklist_set):
+def analyze_file(file_abspath, blacklist_set):
     """performs analysis of top n pageviews
 
     Arguments:
-        filename {string} -- name of gzip file to analyze
+        file_abspath {string} -- path to gzip file to analyze
        Set(Tuple(str, str))-- set of (domain_code, page_title) tuples to blacklist
     """
+    filename = filename_from_path(file_abspath)
+
     print(f'processing {filename}')
-    most_viewed_map = build_most_viewed_map(filename, blacklist_set)
-    persist_results(filename, most_viewed_map)
-    delete_tmp_file(filename)
+    most_viewed_map = build_most_viewed_map(file_abspath, blacklist_set)
+    persist_results(file_abspath, most_viewed_map)
+    os.remove(file_abspath)
+    print(f'finished processing {filename}')
 
 
-def build_most_viewed_map(filename, blacklist_set):
+def build_most_viewed_map(file_abspath, blacklist_set):
     """get a dictionary of top n most viewed pages for each domain
 
     Arguments:
-        filename {string} -- name of gzip file to analyze
+        file_abspath {string} -- path to gzip file to analyze
         blacklist_set {set} -- set of blacklisted domains and pagenames
 
     Returns:
@@ -70,13 +77,8 @@ def build_most_viewed_map(filename, blacklist_set):
     most_viewed_map = defaultdict(list)
 
     # read the gzip file
-    path = os.path.join(TMP_DIR, filename)
-    with gzip.open(path, mode='rt') as f:
+    with gzip.open(file_abspath, mode='rt') as f:
         for line in f:
-            # split on whitespace
-            # expected format: [domain_code page_title count_views total_response_size]
-            # in this case, we only need the first three
-            split = line.split()
 
             # sometimes lines can be malformed
             # e.g. too many elements after the split, or
@@ -85,57 +87,108 @@ def build_most_viewed_map(filename, blacklist_set):
             # probably not worth crashing the process bc of unexpected data,
             # so we just print and move on
             try:
-                assert len(split) == 4
-
-                # extract the data
-                domain_code = split[0]
-                page_title = split[1]
-                count_views = int(split[2])
+                domain_code, page_title, count_views = get_line_info(line)
 
             # problematic lines are not added to most_viewed_map
             # we print them so that there's some record of them
             except (AssertionError, ValueError):
-                print(f'malformed line in {filename}: {line.strip()}')
+                print(f'malformed line in {file_abspath}: {line.strip()}')
                 continue
 
             # make sure that the domain and page are not blacklisted
-            if (domain_code, page_title) in blacklist_set:
+            if in_blacklist_set(domain_code, page_title, blacklist_set):
                 continue
 
-            # get the list of top n pageviews for the domain
-            min_heap = most_viewed_map[domain_code]
-
-            # convert count_views and page_title to immutable data type
-            page_view_tuple = (count_views, page_title)
-
-            # we use a min heap to keep track of the n most viewed pages
-            # if the heap is not "full", we can freely add items to it
-            if len(min_heap) < TOP_N_PAGEVIEWS:
-                heapq.heappush(min_heap, page_view_tuple)
-
-            # otherwise, if the new page has more views than the least viewed
-            # page in the heap, we pop the smallest element and add the new one
-            elif min_heap[0] < page_view_tuple:
-                heapq.heappop(min_heap)
-                heapq.heappush(min_heap, page_view_tuple)
-
-            # add the possibly updated heap back to the most_viewed_map
-            most_viewed_map[domain_code] = min_heap
+            add_to_map(most_viewed_map, domain_code, page_title, count_views)
 
     return most_viewed_map
 
 
-def persist_results(filename, most_viewed_map):
+def get_line_info(line):
+    """extract the necessary info from a line of the gzip file
+
+    Arguments:
+        line {str} -- line of text from one of the gzip archives
+
+    Returns:
+        Tuple(str, str, int) -- domain_code, page_title, count_views
+    """
+    # split on whitespace
+    # expected format: [domain_code page_title count_views total_response_size]
+    # in this case, we only need the first three, but still check to see
+    # if the line is well-formed
+    split = line.split()
+
+    assert len(split) == 4
+
+    # extract the data
+    domain_code = split[0]
+    page_title = split[1]
+    count_views = int(split[2])
+
+    return domain_code, page_title, count_views
+
+
+def in_blacklist_set(domain_code, page_title, blacklist_set):
+    """check if a given domain_code and page_title is in the set of blacklisted domains/pages
+
+    Arguments:
+        domain_code {str} -- domain code
+        page_title {str} -- page title
+        blacklist_set {Set(Tuple(str, str))} -- set of all (domain_code, page_title) tuples that are blacklisted
+
+    Returns:
+        bool -- True if in blacklist, False otherwise
+    """
+    return (domain_code, page_title) in blacklist_set
+
+
+def add_to_map(most_viewed_map, domain_code, page_title, count_views, top_n_pageviews=TOP_N_PAGEVIEWS):
+    """add page info to the most viewed map, if one of the most viewed
+
+    Arguments:
+        most_viewed_map Dict[str, List[Tuple(int, str)]] -- keys are domains, values are lists of top n most viewed pages
+        domain_code {str} -- domain code
+        page_title {str} -- page title
+        count_views {int} -- number of views a page has
+
+    Keyword Arguments:
+        top_n_pageviews {int} -- only add pages to the map if they are in the top n of pageviews (default: {config.TOP_N_PAGEVIEWS})
+    """
+    # get the list of top n pageviews for the domain
+    min_heap = most_viewed_map[domain_code]
+
+    # convert count_views and page_title to immutable data type
+    page_view_tuple = (count_views, page_title)
+
+    # we use a min heap to keep track of the n most viewed pages
+    # if the heap is not "full", we can freely add items to it
+    if len(min_heap) < top_n_pageviews:
+        heapq.heappush(min_heap, page_view_tuple)
+
+    # otherwise, if the new page has more views than the least viewed
+    # page in the heap, we pop the smallest element and add the new one
+    elif min_heap[0] < page_view_tuple:
+        heapq.heappop(min_heap)
+        heapq.heappush(min_heap, page_view_tuple)
+
+    # add the possibly updated heap back to the most_viewed_map
+    most_viewed_map[domain_code] = min_heap
+
+
+def persist_results(abspath, most_viewed_map):
     """save the date collected in most_viewed_map to a file
 
     Arguments:
-        filename {str} -- name of the file to persist
+        abspath {str} -- name of the file to persist
         most_viewed_map {Dict[str, List[Tuple(int, str)]]} -- keys are domains, values are lists of top n most viewed pages per domain
     """
 
     # strip the ".gz" from filenames
-    if filename.endswith('.gz'):
-        filename = filename[:-3]
+    if abspath.endswith('.gz'):
+        abspath = abspath[:-3]
+
+    filename = abspath.split('/')[-1]
 
     # path to save file to
     result_path = os.path.join(RESULTS_DIR, filename)
@@ -149,16 +202,6 @@ def persist_results(filename, most_viewed_map):
                 # write the line
                 f.write(
                     f'{domain} {page_view_tuple[1]} {page_view_tuple[0]}\n')
-
-
-def delete_tmp_file(filename):
-    """delete the gzip archive file
-
-    Arguments:
-        filename {str} -- name of file to delete from tmp dir
-    """
-    tmp_path = os.path.join(TMP_DIR, filename)
-    os.remove(tmp_path)
 
 
 def make_blacklist_set():
@@ -182,3 +225,13 @@ def make_blacklist_set():
             blacklist_set.add((domain_code, page_title))
 
     return blacklist_set
+
+
+def fill_queue_from_tmp(queue):
+    """fill queue with gzip files that have already been download to tmp
+
+    Arguments:
+        queue {Queue(str)} -- queue of paths of gzip archives to process
+    """
+    path = os.path.join(TMP_DIR, '*.gz')
+    [queue.put(abspath) for abspath in glob.glob(path)]

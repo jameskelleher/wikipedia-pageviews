@@ -4,7 +4,7 @@ import asyncio
 from aiohttp import ClientSession, ClientResponseError
 
 from .config import TMP_DIR
-from .decorators import killswitch_on_exception
+from .utils import killswitch_on_exception
 
 
 @killswitch_on_exception
@@ -113,7 +113,7 @@ async def file_download_worker(url_queue, pageviews_queue, session, process_kill
             print(f'finished downloading {filename}')
 
             # pass the name of the downloaded gzip to the file analyzing queue
-            pageviews_queue.put(filename)
+            pageviews_queue.put(dest)
 
         # handle exceptions
         except ClientResponseError as e:
