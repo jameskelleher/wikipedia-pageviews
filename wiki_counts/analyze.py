@@ -49,7 +49,6 @@ def analyze_file(filename, blacklist_set):
         filename {string} -- name of gzip file to analyze
        Set(Tuple(str, str))-- set of (domain_code, page_title) tuples to blacklist
     """
-    raise ValueError('lol')
     print(f'processing {filename}')
     most_viewed_map = build_most_viewed_map(filename, blacklist_set)
     persist_results(filename, most_viewed_map)
