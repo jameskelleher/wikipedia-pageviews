@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 
 from .config import TMP_DIR, RESULTS_DIR, TOP_N_PAGEVIEWS, ROOT_DIR
-from .wrapper import killswitch_on_exception
+from .decorators import killswitch_on_exception
 
 
 @killswitch_on_exception
@@ -40,7 +40,6 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
 
             # analyzes the gzip archive
             analyze_file(filename, blacklist_set)
-
 
 
 def analyze_file(filename, blacklist_set):

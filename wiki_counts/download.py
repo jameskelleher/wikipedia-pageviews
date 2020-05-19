@@ -4,7 +4,7 @@ import asyncio
 from aiohttp import ClientSession, ClientResponseError
 
 from .config import TMP_DIR
-from .wrapper import killswitch_on_exception
+from .decorators import killswitch_on_exception
 
 
 @killswitch_on_exception
@@ -28,7 +28,6 @@ def async_download(urls, pageviews_queue, downloads_done, num_workers, process_k
     # set the shared boolean flag to True
     # when the pageviews_queue is empty, this causes the file analyzer to halt
     downloads_done.value = True
-
 
 
 async def run_async_download(urls, pageviews_queue, num_workers, process_killswitch):

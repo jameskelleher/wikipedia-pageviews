@@ -6,6 +6,7 @@ from wiki_counts.analyze import analyze_from_queue
 from multiprocessing import Process, Manager
 from multiprocessing.sharedctypes import Value
 
+
 def run_multiprocess(start_date=None, end_date=None):
     """main function, orchestrate file downloader process and file analysis process
 
@@ -52,7 +53,6 @@ def run_multiprocess(start_date=None, end_date=None):
         download_process.join()
         for fp in fileread_processes:
             fp.join()
-
 
 
 if __name__ == '__main__':
