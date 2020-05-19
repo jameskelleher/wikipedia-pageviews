@@ -2,36 +2,49 @@
 import gzip
 import heapq
 import os
+import time
+import traceback
 
 from collections import defaultdict
 
 from .config import TMP_DIR, RESULTS_DIR, TOP_N_PAGEVIEWS, ROOT_DIR
 
-import time
 
 
-def analyze_from_queue(queue, downloads_done):
+def analyze_from_queue(queue, downloads_done, process_killswitch):
     """driver function that calls analyze_file on filenames read from queue
 
     Arguments:
         queue {multiprocessing.Queue} -- queue that provides names of downloaded files
-        downloads_done {multiprocessing.Value(bool)} -- boolean flag that indicates when downloads are done
+        downloads_done {multiprocessing.Value(bool)} -- flag that indicates when downloads are done
+        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process
+                                                            because of an error in another process
     """
 
-    # get the list of domains and pages to not include in the analysis
-    blacklist_set = make_blacklist_set()
+    try:
+        # get the list of domains and pages to not include in the analysis
+        blacklist_set = make_blacklist_set()
 
-    # as long as downloads are not done or the queue is not empty, this process runs
-    while not downloads_done.value or not queue.empty():
-        if queue.empty():
-            print('no files yet!')
-            time.sleep(5)
-        else:
-            # pulls the name of a downloaded gzip archive
-            filename = queue.get()
+        # as long as downloads are not done or the queue is not empty,
+        # this process runs
+        while not downloads_done.value or not queue.empty():
+            if process_killswitch.value:
+                print('process killed')
+                return
 
-            # analyzes the gzip archive
-            analyze_file(filename, blacklist_set)
+            if queue.empty():
+                print('no files yet!')
+                time.sleep(5)
+            else:
+                # pulls the name of a downloaded gzip archive
+                filename = queue.get()
+
+                # analyzes the gzip archive
+                analyze_file(filename, blacklist_set)
+    except:
+        traceback.print_exc()
+        print('killing all processes')
+        process_killswitch.value = True
 
 
 def analyze_file(filename, blacklist_set):
@@ -41,6 +54,7 @@ def analyze_file(filename, blacklist_set):
         filename {string} -- name of gzip file to analyze
        Set(Tuple(str, str))-- set of (domain_code, page_title) tuples to blacklist
     """
+    raise ValueError('lol')
     print(f'processing {filename}')
     most_viewed_map = build_most_viewed_map(filename, blacklist_set)
     persist_results(filename, most_viewed_map)
@@ -71,9 +85,11 @@ def build_most_viewed_map(filename, blacklist_set):
             split = line.split()
 
             # sometimes lines can be malformed
-            # e.g. too many elements after the split, third value in split not an int
+            # e.g. too many elements after the split, or
+            # third value in split not an int
             # this is especially common in earlier data dumps
-            # probably not worth crashing the process bc of unexpected data, so we just print and move on
+            # probably not worth crashing the process bc of unexpected data,
+            # so we just print and move on
             try:
                 assert len(split) == 4
 

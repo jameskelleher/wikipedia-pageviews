@@ -27,14 +27,20 @@ def run_multiprocess(start_date=None, end_date=None):
         # knows that there will be no more filenames added to the Queue
         downloads_done = Value('b', False)
 
+        process_killswitch = Value('b', False)
+
         # set up the file download process
         download_process = Process(
             target=async_download,
-            args=(urls, queue, downloads_done, DEFAULT_NUM_DOWNLOADERS))
+            args=(
+                urls, queue, downloads_done,
+                DEFAULT_NUM_DOWNLOADERS, process_killswitch))
 
         # set up the file analysis process
         fileread_processes = [
-            Process(target=analyze_from_queue, args=(queue, downloads_done))
+            Process(
+                target=analyze_from_queue,
+                args=(queue, downloads_done, process_killswitch))
             for _ in range(DEFAULT_NUM_FILE_PROCESSORS)]
 
         # start the processes

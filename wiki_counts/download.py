@@ -1,12 +1,13 @@
 import os
 import asyncio
+import traceback
 
 from aiohttp import ClientSession, ClientResponseError
 
 from .config import TMP_DIR
 
 
-def async_download(urls, pageviews_queue, downloads_done, num_workers):
+def async_download(urls, pageviews_queue, downloads_done, num_workers, process_killswitch):
     """driver function for file download
 
     Arguments:
@@ -14,24 +15,36 @@ def async_download(urls, pageviews_queue, downloads_done, num_workers):
         pageviews_queue {multiprocessing.Queue} -- queue that pass downloaded file names to the pageview analyzing process
         downloads_done {Value(bool)} -- shared memory flag that communicates this process is done to pageview analyzing process
         num_workers {int} -- number of async threads to download the urls
+        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
     """
-    print(f'number of files to download: {len(urls)}')
-    asyncio.run(run_async_download(urls, pageviews_queue, num_workers))
+    try:
+        print(f'number of files to download: {len(urls)}')
+        asyncio.run(
+            run_async_download(
+                urls, pageviews_queue, num_workers, process_killswitch))
 
-    print('downloads completed')
+        print('downloads completed')
 
-    # set the shared boolean flag to True
-    # when the pageviews_queue is empty, this causes the file analyzer to halt
-    downloads_done.value = True
+        # set the shared boolean flag to True
+        # when the pageviews_queue is empty, this causes the file analyzer to halt
+        downloads_done.value = True
+
+    # if any unexpected error occurs,
+    # print the traceback and kill all other processes
+    except:
+        traceback.print_exc()
+        print('killing all processes')
+        process_killswitch.value = True
 
 
-async def run_async_download(urls, pageviews_queue, num_workers):
+async def run_async_download(urls, pageviews_queue, num_workers, process_killswitch):
     """use python async to download files
 
     Arguments:
         urls {List[str]} -- list of urls to download files from
         pageviews_queue {multiprocessing.Queue} -- queue that pass downloaded file names to the pageview analyzing process
         num_workers {int} -- number of async threads to download the urls
+        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
     """
     # create a queue that will store urls to download
     url_queue = asyncio.Queue()
@@ -47,7 +60,8 @@ async def run_async_download(urls, pageviews_queue, num_workers):
     async with ClientSession() as session:
         # create downloading tasks, that will read from url_queue
         tasks = [asyncio.create_task(
-            file_download_worker(url_queue, pageviews_queue, session))
+            file_download_worker(
+                url_queue, pageviews_queue, session, process_killswitch))
             for _ in range(num_workers)]
 
         # wait for queue to be emptied out
@@ -61,18 +75,34 @@ async def run_async_download(urls, pageviews_queue, num_workers):
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def file_download_worker(url_queue, pageviews_queue, session):
+async def file_download_worker(url_queue, pageviews_queue, session, process_killswitch):
     """download urls pulled from the url queue, and pass their filename to the pageview analyzer
 
     Arguments:
         url_queue {asyncio.Queue} -- queue of urls to download gzips from
         pageviews_queue {multiproccesing.Queue} -- queue that passes names of downloaded gzips to the file analyzing process
         session {ClientSession} -- handles async http
+        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
     """
-    # task runs until cancelled in run_async_download
+    # runs until url_queue is marked as "task_done" for every item in it
     while True:
+
+        # if another process failed unexpectedly, kill this one too
+        if process_killswitch.value:
+            print('thread killed')
+            # asyncio will hang on "url_queue.join()" in run_async_download
+            # until every task in the queue is marked as done
+            # so if we need to kill this process, mark the queue as
+            # task_done for every url remaining in it
+            while not url_queue.empty():
+                await url_queue.get()
+                url_queue.task_done()
+            return
+
+        # get the url to download from the queue
         url = await url_queue.get()
         
+        # get the actual name of the file from the url
         filename = url.split('/')[-1]
         print(f'downloading {filename}')
 
