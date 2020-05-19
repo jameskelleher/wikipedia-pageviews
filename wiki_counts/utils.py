@@ -1,4 +1,5 @@
 import traceback
+import os
 
 from functools import wraps
 
@@ -35,7 +36,7 @@ def killswitch_on_exception(func):
 
 
 def filename_from_path(file_path, remove_gz=False):
-    """extract the filename from its path, removing ".gz" if necessary
+    """extract the filename from its path, works for urls too
 
     Arguments:
         file_path {str} -- path to file
@@ -46,7 +47,7 @@ def filename_from_path(file_path, remove_gz=False):
     Returns:
         str -- name of file
     """
-    filename = file_path.split('/')[-1]
+    filename = os.path.split(file_path)[-1]
     if remove_gz and filename.endswith('.gz'):
         filename = filename[:-3]
 

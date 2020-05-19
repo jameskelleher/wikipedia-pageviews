@@ -184,11 +184,7 @@ def persist_results(abspath, most_viewed_map):
         most_viewed_map {Dict[str, List[Tuple(int, str)]]} -- keys are domains, values are lists of top n most viewed pages per domain
     """
 
-    # strip the ".gz" from filenames
-    if abspath.endswith('.gz'):
-        abspath = abspath[:-3]
-
-    filename = abspath.split('/')[-1]
+    filename = filename_from_path(abspath, remove_gz=True)
 
     # path to save file to
     result_path = os.path.join(RESULTS_DIR, filename)

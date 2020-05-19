@@ -4,7 +4,7 @@ import asyncio
 from aiohttp import ClientSession, ClientResponseError
 
 from .config import TMP_DIR
-from .utils import killswitch_on_exception
+from .utils import killswitch_on_exception, filename_from_path
 
 
 @killswitch_on_exception
@@ -96,7 +96,7 @@ async def file_download_worker(url_queue, pageviews_queue, session, process_kill
         url = await url_queue.get()
 
         # get the actual name of the file from the url
-        filename = url.split('/')[-1]
+        filename = filename_from_path(url.split('/')[-1])
         print(f'downloading {filename}')
 
         # try to download the file contents
