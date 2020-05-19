@@ -3,14 +3,14 @@ import gzip
 import heapq
 import os
 import time
-import traceback
 
 from collections import defaultdict
 
 from .config import TMP_DIR, RESULTS_DIR, TOP_N_PAGEVIEWS, ROOT_DIR
+from .wrapper import killswitch_on_exception
 
 
-
+@killswitch_on_exception
 def analyze_from_queue(queue, downloads_done, process_killswitch):
     """driver function that calls analyze_file on filenames read from queue
 
@@ -21,30 +21,26 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
                                                             because of an error in another process
     """
 
-    try:
-        # get the list of domains and pages to not include in the analysis
-        blacklist_set = make_blacklist_set()
+    # get the list of domains and pages to not include in the analysis
+    blacklist_set = make_blacklist_set()
 
-        # as long as downloads are not done or the queue is not empty,
-        # this process runs
-        while not downloads_done.value or not queue.empty():
-            if process_killswitch.value:
-                print('process killed')
-                return
+    # as long as downloads are not done or the queue is not empty,
+    # this process runs
+    while not downloads_done.value or not queue.empty():
+        if process_killswitch.value:
+            print('process killed')
+            return
 
-            if queue.empty():
-                print('no files yet!')
-                time.sleep(5)
-            else:
-                # pulls the name of a downloaded gzip archive
-                filename = queue.get()
+        if queue.empty():
+            print('no files yet!')
+            time.sleep(5)
+        else:
+            # pulls the name of a downloaded gzip archive
+            filename = queue.get()
 
-                # analyzes the gzip archive
-                analyze_file(filename, blacklist_set)
-    except:
-        traceback.print_exc()
-        print('killing all processes')
-        process_killswitch.value = True
+            # analyzes the gzip archive
+            analyze_file(filename, blacklist_set)
+
 
 
 def analyze_file(filename, blacklist_set):

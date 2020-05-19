@@ -1,12 +1,13 @@
 import os
 import asyncio
-import traceback
 
 from aiohttp import ClientSession, ClientResponseError
 
 from .config import TMP_DIR
+from .wrapper import killswitch_on_exception
 
 
+@killswitch_on_exception
 def async_download(urls, pageviews_queue, downloads_done, num_workers, process_killswitch):
     """driver function for file download
 
@@ -17,24 +18,17 @@ def async_download(urls, pageviews_queue, downloads_done, num_workers, process_k
         num_workers {int} -- number of async threads to download the urls
         process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
     """
-    try:
-        print(f'number of files to download: {len(urls)}')
-        asyncio.run(
-            run_async_download(
-                urls, pageviews_queue, num_workers, process_killswitch))
+    print(f'number of files to download: {len(urls)}')
+    asyncio.run(
+        run_async_download(
+            urls, pageviews_queue, num_workers, process_killswitch))
 
-        print('downloads completed')
+    print('downloads completed')
 
-        # set the shared boolean flag to True
-        # when the pageviews_queue is empty, this causes the file analyzer to halt
-        downloads_done.value = True
+    # set the shared boolean flag to True
+    # when the pageviews_queue is empty, this causes the file analyzer to halt
+    downloads_done.value = True
 
-    # if any unexpected error occurs,
-    # print the traceback and kill all other processes
-    except:
-        traceback.print_exc()
-        print('killing all processes')
-        process_killswitch.value = True
 
 
 async def run_async_download(urls, pageviews_queue, num_workers, process_killswitch):
@@ -101,7 +95,7 @@ async def file_download_worker(url_queue, pageviews_queue, session, process_kill
 
         # get the url to download from the queue
         url = await url_queue.get()
-        
+
         # get the actual name of the file from the url
         filename = url.split('/')[-1]
         print(f'downloading {filename}')
