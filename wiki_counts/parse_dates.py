@@ -87,7 +87,7 @@ def date_to_url(datetime, already_downloaded):
 
     Arguments:
         datetime {datetime, Timestamp} -- datetime whose wiki pageviews dump will be downloaded
-        already_downloaded {set} -- set of filenames for datetimes whose pageviews have already been downloaded and processed
+        already_downloaded {Set(str)} -- set of filenames for datetimes whose pageviews have already been downloaded and processed
 
     Returns:
         string, None -- url to download, or None if data already downloaded and processed
@@ -112,7 +112,7 @@ def get_exclusion_set():
     """get a set of files we don't need to download, because they are processed or are ready to be processed
 
     Returns:
-        set -- set of filenames for datetimes whose pageviews or archives have already been downloaded
+        Set(str) -- set of filenames for datetimes whose pageviews or archives have already been downloaded
     """
 
     # for every results file that we have in results, add the filename

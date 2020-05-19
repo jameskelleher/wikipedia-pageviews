@@ -51,7 +51,7 @@ def analyze_file(file_abspath, blacklist_set):
 
     Arguments:
         file_abspath {string} -- path to gzip file to analyze
-       Set(Tuple(str, str))-- set of (domain_code, page_title) tuples to blacklist
+        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
     """
     filename = filename_from_path(file_abspath)
 
@@ -67,7 +67,7 @@ def build_most_viewed_map(file_abspath, blacklist_set):
 
     Arguments:
         file_abspath {string} -- path to gzip file to analyze
-        blacklist_set {set} -- set of blacklisted domains and pagenames
+        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
 
     Returns:
         Dict[str, List[Tuple(int, str)]] -- keys are domains, values are lists of top n most viewed pages
@@ -135,7 +135,7 @@ def in_blacklist_set(domain_code, page_title, blacklist_set):
     Arguments:
         domain_code {str} -- domain code
         page_title {str} -- page title
-        blacklist_set {Set(Tuple(str, str))} -- set of all (domain_code, page_title) tuples that are blacklisted
+        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
 
     Returns:
         bool -- True if in blacklist, False otherwise
@@ -204,7 +204,7 @@ def make_blacklist_set():
     """get set of domains and page titles to not include in the analysis
 
     Returns:
-        Set(Tuple(str, str))-- set of (domain_code, page_title) tuples to blacklist
+       Set(Tuple(str, str)) -- set of blacklisted (domain_code, page_names) tuples
     """
     blacklist_file = os.path.join(ROOT_DIR, 'blacklist_domains_and_pages')
     blacklist_set = set()
