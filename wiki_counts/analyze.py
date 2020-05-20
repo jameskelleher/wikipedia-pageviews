@@ -4,21 +4,26 @@ import heapq
 import os
 import glob
 import time
+import multiprocessing
 
 from collections import defaultdict
+from typing import Set, Tuple, Dict, List
 
 from .config import TMP_DIR, RESULTS_DIR, TOP_N_PAGEVIEWS, ROOT_DIR
 from .utils import killswitch_on_exception, filename_from_path
 
 
 @killswitch_on_exception
-def analyze_from_queue(queue, downloads_done, process_killswitch):
+def analyze_from_queue(
+        queue: multiprocessing.Queue,
+        downloads_done: multiprocessing.Value,
+        process_killswitch):
     """driver function that calls analyze_file on filenames read from queue
 
     Arguments:
         queue {multiprocessing.Queue} -- queue that provides names of downloaded files
-        downloads_done {multiprocessing.Value(bool)} -- flag that indicates when downloads are done
-        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process
+        downloads_done {multiprocessing.Value[bool]} -- flag that indicates when downloads are done
+        process_killswitch {multiprocessing.Value[bool]} -- flag that indicates to kill this process
                                                             because of an error in another process
     """
 
@@ -44,12 +49,12 @@ def analyze_from_queue(queue, downloads_done, process_killswitch):
             analyze_file(file_abspath, blacklist_set)
 
 
-def analyze_file(file_abspath, blacklist_set):
+def analyze_file(file_abspath: str, blacklist_set: Set[Tuple[str, str]]):
     """performs analysis of top n pageviews
 
     Arguments:
         file_abspath {string} -- path to gzip file to analyze
-        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
+        blacklist_set {Set[Tuple[str, str]]} -- set of blacklisted (domain_code, page_names) tuples
     """
     filename = filename_from_path(file_abspath)
 
@@ -60,15 +65,17 @@ def analyze_file(file_abspath, blacklist_set):
     print(f'finished processing {filename}')
 
 
-def build_most_viewed_map(file_abspath, blacklist_set):
+def build_most_viewed_map(
+        file_abspath: str,
+        blacklist_set: Set[Tuple[str, str]]) -> Dict[str, List[Tuple[int, str]]]:
     """get a dictionary of top n most viewed pages for each domain
 
     Arguments:
         file_abspath {string} -- path to gzip file to analyze
-        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
+        blacklist_set {Set[Tuple[str, str]]} -- set of blacklisted (domain_code, page_names) tuples
 
     Returns:
-        Dict[str, List[Tuple(int, str)]] -- keys are domains, values are lists of top n most viewed pages
+        Dict[str, List[Tuple[int, str]]] -- keys are domains, values are lists of top n most viewed pages
     """
 
     # initialize our dictionary
@@ -97,19 +104,20 @@ def build_most_viewed_map(file_abspath, blacklist_set):
             if in_blacklist_set(domain_code, page_title, blacklist_set):
                 continue
 
-            add_to_heap_map(most_viewed_map, domain_code, page_title, count_views)
+            add_to_heap_map(most_viewed_map, domain_code,
+                            page_title, count_views)
 
     return most_viewed_map
 
 
-def get_line_info(line):
+def get_line_info(line: str) -> Tuple[str, str, int]:
     """extract the necessary info from a line of the gzip file
 
     Arguments:
         line {str} -- line of text from one of the gzip archives
 
     Returns:
-        Tuple(str, str, int) -- domain_code, page_title, count_views
+        Tuple[str, str, int] -- domain_code, page_title, count_views
     """
     # split on whitespace
     # expected format: [domain_code page_title count_views total_response_size]
@@ -127,13 +135,15 @@ def get_line_info(line):
     return domain_code, page_title, count_views
 
 
-def in_blacklist_set(domain_code, page_title, blacklist_set):
+def in_blacklist_set(
+        domain_code: str, page_title: str,
+        blacklist_set: Set[Tuple[str, str]]) -> bool:
     """check if a given domain_code and page_title is in the set of blacklisted domains/pages
 
     Arguments:
         domain_code {str} -- domain code
         page_title {str} -- page title
-        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
+        blacklist_set {Set[Tuple[str, str]]} -- set of blacklisted (domain_code, page_names) tuples
 
     Returns:
         bool -- True if in blacklist, False otherwise
@@ -141,11 +151,14 @@ def in_blacklist_set(domain_code, page_title, blacklist_set):
     return (domain_code, page_title) in blacklist_set
 
 
-def add_to_heap_map(most_viewed_map, domain_code, page_title, count_views, top_n_pageviews=TOP_N_PAGEVIEWS):
+def add_to_heap_map(
+        most_viewed_map: Dict[str, List[Tuple[int, str]]],
+        domain_code: str, page_title: str, count_views: int,
+        top_n_pageviews: int = TOP_N_PAGEVIEWS):
     """add page info to the most viewed map, if one of the most viewed
 
     Arguments:
-        most_viewed_map Dict[str, List[Tuple(int, str)]] -- keys are domains, values are lists of top n most viewed pages
+        most_viewed_map Dict[str, List[Tuple[int, str]]] -- keys are domains, values are lists of top n most viewed pages
         domain_code {str} -- domain code
         page_title {str} -- page title
         count_views {int} -- number of views a page has
@@ -174,12 +187,14 @@ def add_to_heap_map(most_viewed_map, domain_code, page_title, count_views, top_n
     most_viewed_map[domain_code] = min_heap
 
 
-def persist_results(abspath, most_viewed_map):
+def persist_results(
+        abspath: str,
+        most_viewed_map: Dict[str, List[Tuple[int, str]]]):
     """save the date collected in most_viewed_map to a file
 
     Arguments:
         abspath {str} -- name of the file to persist
-        most_viewed_map {Dict[str, List[Tuple(int, str)]]} -- keys are domains, values are lists of top n most viewed pages per domain
+        most_viewed_map {Dict[str, List[Tuple[int, str]]]} -- keys are domains, values are lists of top n most viewed pages per domain
     """
 
     filename = filename_from_path(abspath, remove_gz=True)
@@ -201,11 +216,11 @@ def persist_results(abspath, most_viewed_map):
                     f'{domain} {page_view_tuple[1]} {page_view_tuple[0]}\n')
 
 
-def make_blacklist_set():
+def make_blacklist_set() -> Set[Tuple[str, str]]:
     """get set of domains and page titles to not include in the analysis
 
     Returns:
-       Set(Tuple(str, str)) -- set of blacklisted (domain_code, page_names) tuples
+       Set[Tuple[str, str]] -- set of blacklisted (domain_code, page_names) tuples
     """
     blacklist_file = os.path.join(ROOT_DIR, 'blacklist_domains_and_pages')
     blacklist_set = set()
@@ -221,20 +236,20 @@ def make_blacklist_set():
     return blacklist_set
 
 
-def add_to_blacklist(line, blacklist_set):
+def add_to_blacklist(line: str, blacklist_set: Set[Tuple[str, str]]):
     """add data from a line of the blacklist file to the blacklist_set
 
     Arguments:
         line {str} -- line from the blacklist file
-        blacklist_set {Set(Tuple(str, str))} -- set of blacklisted (domain_code, page_names) tuples
+        blacklist_set {Set[Tuple[str, str]]} -- set of blacklisted (domain_code, page_names) tuples
     """
-    split = line.strip().split()
-    
+    split=line.strip().split()
+
     # check input data is good
     assert len(split) == 2
-        
-    domain_code = split[0]
-    page_title = split[1]
+
+    domain_code=split[0]
+    page_title=split[1]
 
     # cache domain_code and page_title as a tuple
     blacklist_set.add((domain_code, page_title))

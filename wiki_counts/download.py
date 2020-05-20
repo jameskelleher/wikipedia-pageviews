@@ -1,22 +1,29 @@
 import os
 import asyncio
+import multiprocessing
 
 from aiohttp import ClientSession, ClientResponseError
+from typing import List
 
 from .config import TMP_DIR
 from .utils import killswitch_on_exception, filename_from_path
 
 
 @killswitch_on_exception
-def async_download(urls, pageviews_queue, downloads_done, num_workers, process_killswitch):
+def async_download(
+        urls: List[str],
+        pageviews_queue: multiprocessing.Queue,
+        downloads_done: multiprocessing.Value,
+        num_workers: int,
+        process_killswitch: multiprocessing.Value):
     """driver function for file download
 
     Arguments:
         urls {List[str]} -- list of urls to download files from
         pageviews_queue {multiproccesing.Queue} -- queue that passes paths to downloaded gzips to the file analyzing process
-        downloads_done {Value(bool)} -- shared memory flag that communicates this process is done to pageview analyzing process
+        downloads_done {multiproccesing.Value[bool]} -- shared memory flag that communicates this process is done to pageview analyzing process
         num_workers {int} -- number of async threads to download the urls
-        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
+        process_killswitch {multiprocessing.Value[bool]} -- flag that indicates to kill this process because of an error in another process
     """
     print(f'number of files to download: {len(urls)}')
     asyncio.run(
@@ -30,14 +37,18 @@ def async_download(urls, pageviews_queue, downloads_done, num_workers, process_k
     downloads_done.value = True
 
 
-async def run_async_download(urls, pageviews_queue, num_workers, process_killswitch):
+async def run_async_download(
+        urls: List[str],
+        pageviews_queue: multiprocessing.Queue,
+        num_workers: int,
+        process_killswitch: multiprocessing.Value):
     """use python async to download files
 
     Arguments:
         urls {List[str]} -- list of urls to download files from
         pageviews_queue {multiproccesing.Queue} -- queue that passes paths to downloaded gzips to the file analyzing process
         num_workers {int} -- number of async threads to download the urls
-        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
+        process_killswitch {multiprocessing.Value[bool]} -- flag that indicates to kill this process because of an error in another process
     """
     # create a queue that will store urls to download
     url_queue = asyncio.Queue()
@@ -68,14 +79,18 @@ async def run_async_download(urls, pageviews_queue, num_workers, process_killswi
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def file_download_worker(url_queue, pageviews_queue, session, process_killswitch):
+async def file_download_worker(
+        url_queue: asyncio.Queue,
+        pageviews_queue: multiprocessing.Queue,
+        session: ClientSession,
+        process_killswitch: multiprocessing.Value):
     """download urls pulled from the url queue, and pass their filename to the pageview analyzer
 
     Arguments:
         url_queue {asyncio.Queue} -- queue of urls to download gzips from
         pageviews_queue {multiproccesing.Queue} -- queue that passes paths to downloaded gzips to the file analyzing process
         session {ClientSession} -- handles async http
-        process_killswitch {multiprocessing.Value(bool)} -- flag that indicates to kill this process because of an error in another process
+        process_killswitch {multiprocessing.Value[bool]} -- flag that indicates to kill this process because of an error in another process
     """
     # runs until url_queue is marked as "task_done" for every item in it
     while True:
@@ -98,7 +113,7 @@ async def file_download_worker(url_queue, pageviews_queue, session, process_kill
             url_queue.task_done()
 
 
-async def kill_process(queue):
+async def kill_process(queue: asyncio.Queue):
     """immediately flush the queue so the process can end
 
     Arguments:
@@ -114,7 +129,10 @@ async def kill_process(queue):
         queue.task_done()
 
 
-async def download_file_from_url(session, url, pageviews_queue):
+async def download_file_from_url(
+        session: ClientSession,
+        url: str,
+        pageviews_queue: multiprocessing.Queue):
     """download a page view gzip file from the url
 
     Arguments:
@@ -122,7 +140,7 @@ async def download_file_from_url(session, url, pageviews_queue):
         url {str} -- url to download gzip file from
         pageviews_queue {multiproccesing.Queue} -- queue that passes paths to downloaded gzips to the file analyzing process
     """
-    # get the actual name of the file from the url
+    # get the name of the file from the url
     filename = filename_from_path(url.split('/')[-1])
     print(f'downloading {filename}')
 
@@ -141,7 +159,10 @@ async def download_file_from_url(session, url, pageviews_queue):
     pageviews_queue.put(dest)
 
 
-async def handle_error(e, url_queue, url):
+async def handle_error(
+        e: ClientResponseError,
+        url_queue: asyncio.Queue,
+        url: str):
     """handle error status codes
 
     Arguments:

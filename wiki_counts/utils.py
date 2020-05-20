@@ -35,7 +35,7 @@ def killswitch_on_exception(func):
     return wrapper
 
 
-def filename_from_path(file_path, remove_gz=False):
+def filename_from_path(file_path: str, remove_gz: bool = False) -> str:
     """extract the filename from its path, works for urls too
 
     Arguments:

@@ -2,11 +2,13 @@ import pandas as pd
 import glob
 import os
 
+from typing import Set, Union, Tuple, List
+
 from .config import ROOT_URL, RESULTS_DIR, TMP_DIR, EARLIEST_DATE
 from .utils import filename_from_path
 
 
-def parse_dates(start, end):
+def parse_dates(start: Union[str, None], end: Union[str, None]) -> List[str]:
     """From a start and end date, return a list of urls to download
 
     Arguments:
@@ -36,7 +38,10 @@ def parse_dates(start, end):
     return to_download
 
 
-def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
+def parse_start_and_end(
+        start: Union[str, None],
+        end: Union[str, None],
+        earliest_date: str = EARLIEST_DATE) -> Tuple[str, str]:
     """parse the start and end dates, and handle any discrepencies
 
     Arguments:
@@ -50,7 +55,7 @@ def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
         ValueError: end date before start date, or date strings not parsable by pd.Timestamp
 
     Returns:
-        Tuple(Timestamp, Timestamp) -- start date and end date as Timestamp objects
+        Tuple[Timestamp, Timestamp] -- start date and end date as Timestamp objects
     """
     # if start is None, set to utcnow minus 24 hours, rounded up to nearest hour
     start = str_to_timestamp(start) if start else \
@@ -70,7 +75,7 @@ def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
     return start, end
 
 
-def str_to_timestamp(time_str):
+def str_to_timestamp(time_str: str) -> pd.Timestamp:
     """convert a datetime, represented as a string, to a pandas Timestamp
 
     Arguments:
@@ -102,12 +107,14 @@ def str_to_timestamp(time_str):
     return ts
 
 
-def date_to_url(datetime, already_downloaded):
+def date_to_url(
+        datetime: pd.Timestamp,
+        already_downloaded: Set[str]) -> Union[str, None]:
     """convert a datetime to its corresponding wiki dump url
 
     Arguments:
         datetime {Timestamp} -- Timestamp whose corresponding wiki pageviews dump will be downloaded
-        already_downloaded {Set(str)} -- set of filenames for datetimes whose pageviews have already been downloaded and processed
+        already_downloaded {Set[str]} -- set of filenames for datetimes whose pageviews have already been downloaded and processed
 
     Returns:
         string, None -- url to download, or None if data already downloaded and processed
@@ -128,11 +135,11 @@ def date_to_url(datetime, already_downloaded):
     return url
 
 
-def get_exclusion_set():
+def get_exclusion_set() -> Set[str]:
     """get a set of files we don't need to download, because they are processed or are ready to be processed
 
     Returns:
-        Set(str) -- set of filenames for datetimes whose pageviews or archives have already been downloaded
+        Set[str] -- set of filenames for datetimes whose pageviews or archives have already been downloaded
     """
 
     # for every results file that we have in results, add the filename
