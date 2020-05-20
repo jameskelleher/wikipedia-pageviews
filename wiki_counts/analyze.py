@@ -170,7 +170,6 @@ def add_to_heap_map(
     # get the list of top n pageviews for the domain
     min_heap = most_viewed_map[domain_code]
 
-    # convert count_views and page_title to immutable data type
     page_view_tuple = (count_views, page_title)
 
     # we use a min heap to keep track of the n most viewed pages
