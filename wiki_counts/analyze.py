@@ -243,13 +243,13 @@ def add_to_blacklist(line: str, blacklist_set: Set[Tuple[str, str]]):
         line {str} -- line from the blacklist file
         blacklist_set {Set[Tuple[str, str]]} -- set of blacklisted (domain_code, page_names) tuples
     """
-    split=line.strip().split()
+    split = line.strip().split()
 
     # check input data is good
     assert len(split) == 2
 
-    domain_code=split[0]
-    page_title=split[1]
+    domain_code = split[0]
+    page_title = split[1]
 
     # cache domain_code and page_title as a tuple
     blacklist_set.add((domain_code, page_title))
