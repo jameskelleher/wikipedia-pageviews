@@ -16,7 +16,7 @@ def run_multiprocess(start_date=None, end_date=None):
     """main function, orchestrate file downloader process and file analysis process
 
     Keyword Arguments:
-        start_date {str, None} -- start date as a string, if None it is set to utcnow minus 24 hours
+        start_date {str, None} -- start date as a string, if None it is set to utcnow minus 24 hours (default: {None})
         end_date {str, None} -- end date as a string, if None function returns only one URL for the start date (default: {None})
     """
 
@@ -79,7 +79,9 @@ if __name__ == '__main__':
     # if no args, just run for last updated file
     if len(sys.argv) <= 1:
         run_multiprocess()
+    # download one hour's worth of dumps
     elif len(sys.argv) == 2:
         run_multiprocess(sys.argv[1])
+    # download for a range
     else:
         run_multiprocess(sys.argv[1], sys.argv[2])

@@ -14,7 +14,7 @@ def parse_dates(start, end):
         end {string, None} -- end date as a string, if None function returns only one URL for the start date
 
     Returns:
-        List -- list of urls to download
+        List[str] -- list of urls to download
     """
     # handle the inputted start and end dates
     start, end = parse_start_and_end(start, end)
@@ -53,11 +53,11 @@ def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
         Tuple(Timestamp, Timestamp) -- start date and end date as Timestamp objects
     """
     # if start is None, set to utcnow minus 24 hours, rounded up to nearest hour
-    start = parse_time_string(start) if start else \
+    start = str_to_timestamp(start) if start else \
         pd.Timestamp.utcnow().ceil('H') - pd.Timedelta(hours=24)
 
     # if end is None, we only get records for one datetime
-    end = parse_time_string(end) if end else start
+    end = str_to_timestamp(end) if end else start
 
     # make sure we don't try to download records before earliest available date
     earliest_start = pd.Timestamp(earliest_date)
@@ -70,7 +70,7 @@ def parse_start_and_end(start, end, earliest_date=EARLIEST_DATE):
     return start, end
 
 
-def parse_time_string(time_str):
+def str_to_timestamp(time_str):
     """convert a datetime, represented as a string, to a pandas Timestamp
 
     Arguments:
