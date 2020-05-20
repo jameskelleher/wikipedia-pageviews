@@ -42,6 +42,8 @@ One task that does not use parallelism is the Date Parser. This takes a start da
 
 The Downloader is coded in `download.py`, the Analyzer in `analyze.py`, and the Date Parser in `parse_dates.py`. Global variables are kept in `config.py`, and a couple of utility functions in `utils.py`. The processes are kicked off and orchestrated by `run_wiki_counts.py`.
 
+Since the size of the heap is bounded, the algorithm processes each file in linear time. Heap pushes and pops are O(log *n*), and *n* <= 25. In the worst case, where we pop and push an element onto the heap, the runtime is O(2 * log(25)) = O(1). If we let *p* represent the average number of pageview lines in a file, and *n* the number of files we'd like to process, the runtime is O(*n* \* *p*).
+
 ## Prompts
 
 ### What additional things would you want to operate this application in a production setting?

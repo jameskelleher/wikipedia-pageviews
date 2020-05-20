@@ -1,5 +1,6 @@
 import os
 import glob
+import multiprocessing
 
 from wiki_counts.config import DEFAULT_NUM_FILE_PROCESSORS, EARLIEST_DATE, \
     DEFAULT_NUM_DOWNLOADERS, TMP_DIR
@@ -9,9 +10,12 @@ from wiki_counts.analyze import analyze_from_queue
 
 from multiprocessing import Process, Manager
 from multiprocessing.sharedctypes import Value
+from typing import Union
 
 
-def run_multiprocess(start_date=None, end_date=None):
+def run_multiprocess(
+        start_date: Union[str, None] = None,
+        end_date: Union[str, None] = None):
     """main function, orchestrate file downloader process and file analysis process
 
     Keyword Arguments:
@@ -35,6 +39,7 @@ def run_multiprocess(start_date=None, end_date=None):
         # knows that there will be no more filenames added to the Queue
         downloads_done = Value('b', False)
 
+        # flag that kills all processes should one fail
         process_killswitch = Value('b', False)
 
         # set up the file download process
@@ -62,11 +67,11 @@ def run_multiprocess(start_date=None, end_date=None):
             fp.join()
 
 
-def fill_queue_from_tmp(queue):
+def fill_queue_from_tmp(queue: multiprocessing.Queue):
     """fill queue with gzip files that have already been download to tmp
 
     Arguments:
-        queue {Queue(str)} -- queue of paths of gzip archives to process
+        queue {multiprocessing.Queue} -- queue of paths of gzip archives to process
     """
     path = os.path.join(TMP_DIR, '*.gz')
     [queue.put(abspath) for abspath in glob.glob(path)]

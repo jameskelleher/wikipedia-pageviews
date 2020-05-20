@@ -104,6 +104,7 @@ def build_most_viewed_map(
             if in_blacklist_set(domain_code, page_title, blacklist_set):
                 continue
 
+            # attempt to add item to heap
             add_to_heap_map(most_viewed_map, domain_code,
                             page_title, count_views)
 
@@ -211,9 +212,8 @@ def persist_results(
             while len(heap) > 0:
                 # this saves our records in increasing order
                 page_view_tuple = heapq.heappop(heap)
-                # write the line
-                f.write(
-                    f'{domain} {page_view_tuple[1]} {page_view_tuple[0]}\n')
+                result = f'{domain} {page_view_tuple[1]} {page_view_tuple[0]}\n'
+                f.write(result)
 
 
 def make_blacklist_set() -> Set[Tuple[str, str]]:
