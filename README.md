@@ -2,7 +2,7 @@
 
 ## Overview
 
-Get the top 25 most viewed pages for every Wikipedia domain at a given datetime
+This program records the top 25 most viewed Wikipedia pages for each domain for a given datetime. It can also be given a start and end time, and will generate a results file for every hour within that range.
 
 ## Installation and Running
 
@@ -27,8 +27,6 @@ Get the top 25 most viewed pages for every Wikipedia domain at a given datetime
 7. To run unit tests, run `pytest`. The unit tests on asynchronous code generate a lot of warnings, so `pytest --disable-warnings` is recommended
 
 ## Discussion
-
-This program records the top 25 most viewed Wikipedia pages for each domain for a given datetime. It can also be given a start and end time, and will generate a results file for every hour within that range.
 
 On first glance, it was clear to me that this problem could be solved using entirely sequential code - for every hour in the range, download the file, process it, move on to the next. However, it was clear to me that this was an easy problem to parallelize. As there is no dependency between the data, the tasks can easily be isolated from each other, and set up to be run concurrently. To speed up processing large ranges of data, and to demonstrate my capacity to work within a distributed context, I used two types of concurrency: multiprocessing and asynchronous I/O.
 
