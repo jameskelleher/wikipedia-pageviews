@@ -1,5 +1,9 @@
 # Wikipedia Pageviews
 
+## Overview
+
+Get the top 10 most viewed pages for every Wikipedia domain at a given datetime
+
 ## Installation and Running
 
 1. If `conda` is not already installed, download it from [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda is a minimal install for `conda` , so it is recommended)
@@ -10,13 +14,17 @@
 
 4. Activate the environment: `conda activate wiki`
 
-5. To run for 24 hours ago: `python run_wiki_counts.py`
+5. Run the program with `run_wiki_counts.py`
 
-6. To run for an exact datetime: `python run_wiki_counts.py "2020-01-01 8:00"`
+    a. To run for 24 hours ago: `python run_wiki_counts.py`
 
-7. To run for every hour between a range of dates: `python run_wiki_counts.py "2020-01-01 8:00" "2020-01-02 20:00"`
+    b. To run for an exact datetime: `python run_wiki_counts.py "2020-01-01 8:00"`
 
-8. To run unit tests, run `pytest`. The unit tests on asynchronous code generate a lot of warnings, so `pytest --disable-warnings` is recommended
+    c. To run for every hour between a range of dates: `python run_wiki_counts.py "2020-01-01 8:00" "2020-01-02 20:00"`
+
+6. Result summary files will be written to a created `results` directory
+
+7. To run unit tests, run `pytest`. The unit tests on asynchronous code generate a lot of warnings, so `pytest --disable-warnings` is recommended
 
 ## Discussion
 
