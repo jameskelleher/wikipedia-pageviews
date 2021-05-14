@@ -2,7 +2,7 @@
 
 ## Overview
 
-Get the top 10 most viewed pages for every Wikipedia domain at a given datetime
+Get the top 25 most viewed pages for every Wikipedia domain at a given datetime
 
 ## Installation and Running
 
